@@ -1,6 +1,6 @@
-#include <eigen3/Eigen/Core>
-#include <eigen3/Eigen/Geometry>
-#include <eigen3/Eigen/QR>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+#include <Eigen/QR>
 #include "calibration.h"
 #include <iostream>
 #include <opencv2/calib3d.hpp>
@@ -9,7 +9,7 @@
 #include <opencv2/imgproc.hpp>
 #include <string>
 #include <opencv2/core/eigen.hpp>
-#include <boost/format.hpp>
+//#include <boost/format.hpp>
 void decomposePMatrix() {
     using namespace Eigen;
 
@@ -98,7 +98,10 @@ void testHomography(){
         cv::Mat result;
         cv::Mat Hmat;
         cv::eigen2cv(H, Hmat);
-        cv::warpPerspective(srcImage, result, Hmat, dstImage.size());
+        cv::warpPerspective(srcImage,
+        
+        
+         result, Hmat, dstImage.size());
         // cv::imshow("result", result);
         // cv::waitKey();
         cv::imwrite("result.jpg", result);
@@ -134,25 +137,48 @@ void testHomography(){
 void testCalibration(){
     // 1.0 准备数据
       std::vector<std::string> files = {
-        "./data/images/left01.jpg",
-        "./data/images/left02.jpg",
-        "./data/images/left03.jpg",
-        "./data/images/left04.jpg",
-        "./data/images/left05.jpg",
-        "./data/images/left06.jpg",
-        "./data/images/left07.jpg",
-        "./data/images/left08.jpg",
-        "./data/images/left09.jpg",
-        "./data/images/left11.jpg",
-        "./data/images/left12.jpg",
-        "./data/images/left13.jpg",
-        "./data/images/left14.jpg",
+        // "./data/images/left01.jpg",
+        // "./data/images/left02.jpg",
+        // "./data/images/left03.jpg",
+        // "./data/images/left04.jpg",
+        // "./data/images/left05.jpg",
+        // "./data/images/left06.jpg",
+        // "./data/images/left07.jpg",
+        // "./data/images/left08.jpg",
+        // "./data/images/left09.jpg",
+        // "./data/images/left11.jpg",
+        // "./data/images/left12.jpg",
+        // "./data/images/left13.jpg",
+        // "./data/images/left14.jpg",
+        "./data/images/image_00.jpg",
+        "./data/images/image_01.jpg",
+        "./data/images/image_02.jpg",
+        "./data/images/image_03.jpg",
+        "./data/images/image_04.jpg",
+        "./data/images/image_05.jpg",
+        "./data/images/image_06.jpg",
+        "./data/images/image_07.jpg",
+        "./data/images/image_08.jpg",
+        "./data/images/image_09.jpg",
+        "./data/images/image_10.jpg",
+        "./data/images/image_11.jpg",
+        "./data/images/image_12.jpg",
+        "./data/images/image_13.jpg",
+        "./data/images/image_14.jpg",
+        "./data/images/image_15.jpg",
+        "./data/images/image_16.jpg",
+        "./data/images/image_17.jpg",
     };
+
+
+
 
     // 2. 提取棋盘格角点
     std::vector<std::vector<Eigen::Vector2d>> imagePoints;
     std::vector<std::vector<Eigen::Vector3d>> objectPoints;
-    cv::Size boardSize(9, 6); // 棋盘格大小
+    cv::Size boardSize(8, 12); // 棋盘格大小
+    // cv::Size boardSize(9, 6); // 棋盘格大小
+
     cv::Size2f squareSize(25., 25.); // 单元格大小， 单位mm
     for(int i=0; i<files.size(); ++i) {
 
@@ -161,6 +187,9 @@ void testCalibration(){
 
         // 提取角点
         bool ok = cv::findChessboardCorners(img, boardSize, corners, cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_FAST_CHECK | cv::CALIB_CB_NORMALIZE_IMAGE);
+        
+        // cout << ok << endl;
+
         if(ok) {
             cv::Mat gray;
             cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
@@ -171,31 +200,45 @@ void testCalibration(){
 //           cv::waitKey(1000);
             std::vector<Eigen::Vector2d> _corners;
             for(auto& pt: corners){
-                _corners.push_back(Eigen::Vector2d(pt.x, pt.y));
+                _corners.push_back(Eigen::Vector2d(pt.x, pt.y)); // 把当前图片的所有corner 一个一个地塞进来_corners里
             }
-            imagePoints.push_back(_corners);
+            imagePoints.push_back(_corners); // 一张图片有很多corner # _corners
         }
 
-    }
-    //3.0 设置世界坐标
+    } 
+
+
+
+    //3.0 设定objects的世界坐标
     for(int i=0; i<imagePoints.size(); ++i){
-        std::vector<Eigen::Vector3d> corners;
-        getObjectPoints(boardSize, squareSize, corners);
+        std::vector<Eigen::Vector3d> corners;            // 存世界坐标系下的物体坐标（角点坐标）
+        getObjectPoints(boardSize, squareSize, corners); // boardSize(w=8, h=12)
         objectPoints.push_back(corners);
     }
 
+
     cv::Mat cameraMatrix = cv::Mat::zeros(3, 3, CV_64F);
-    cv::Mat distCoeffs= cv::Mat::zeros(5, 1, CV_64F);
+    cv::Mat distCoeffs= cv::Mat::zeros(5, 1, CV_64F); // 共有5个畸变参数
     computeCameraCalibration(imagePoints, objectPoints, cameraMatrix, distCoeffs);
+    
+    cout << "------内参参数--畸变参数-----------" << endl;
+    cout << cameraMatrix << endl;
+    cout << distCoeffs << endl;
+
+
 
     cv::Mat undistImag;
     for(int i=0; i<files.size(); ++i) {
-        cv::Mat img = cv::imread(files[i]);
+        // cv::Mat img = cv::imread(files[i]);
+        // cv::Mat img = cv::imread(files[0]);
+        cv::Mat img = cv::imread("/datav/camera_calibration_cpp/workspace/data/images/du.jpg");
+
         cv::undistort(img, undistImag, cameraMatrix, distCoeffs, cameraMatrix);
         // cv::imshow("out", undistImag);
         // cv::waitKey(100);
         cv::imwrite("undistort.jpg", undistImag);
     }
+
 
     // cv::destroyAllWindows();
 
@@ -248,8 +291,8 @@ void testFisherCalibration(){
     std::vector<std::string> files;
 
     for(int i=0; i<32; ++i){
-     boost::format fmt("%s/%s%d.%s");
-     files.push_back( (fmt % "./data/fisher"% "right" % i % "jpg").str());
+     //boost::format fmt("%s/%s%d.%s");
+     //files.push_back( (fmt % "./data/fisher"% "right" % i % "jpg").str());
     }
 
     std::vector<std::vector<Eigen::Vector2d>> imagePoints;
@@ -340,7 +383,6 @@ void testFisherCalibration(){
         ranslation: [-120.19933355765978433, -0.06117490766245021, 0.73604873985802033]}
      */
 }
-
 
 
 int main(int argc, char **argv) {

@@ -205,7 +205,161 @@ inline int rand_int (void)
 {
     return std::rand();
 }
+bool findHomographyByOpenCV(std::vector<Eigen::Vector2d>& srcPoints, std::vector<Eigen::Vector2d>& dstPoints, Eigen::Matrix3d& H) {
 
+    std::vector<cv::Point2f> objectPoints, imagePoints;
+
+    for(int i=0; i<srcPoints.size(); ++i) {
+        objectPoints.push_back(cv::Point2f(srcPoints[i](0), srcPoints[i](1)));
+        imagePoints.push_back(cv::Point2f(dstPoints[i](0), dstPoints[i](1)));
+    }
+
+    cv::Mat hMat = findHomography(objectPoints, imagePoints, cv::RANSAC);
+
+    cv::cv2eigen(hMat, H);
+
+}
+
+
+bool findHomographyByRansac ( std::vector<Eigen::Vector2d>& srcPoints, std::vector<Eigen::Vector2d>& dstPoints, Eigen::Matrix3d& H )
+{
+
+    assert ( srcPoints.size() == dstPoints.size() );
+
+    MatrixXd srcNormal ( srcPoints.size(), 3 );
+    MatrixXd dstNormal ( dstPoints.size(), 3 );
+
+    for ( int i=0; i<srcPoints.size(); ++i ) {
+
+        srcNormal ( i, 0 ) = srcPoints[i] ( 0 );
+        srcNormal ( i, 1 ) = srcPoints[i] ( 1 );
+        srcNormal ( i, 2 ) = 1.0;
+
+        dstNormal ( i, 0 ) = dstPoints[i] ( 0 );
+        dstNormal ( i, 1 ) = dstPoints[i] ( 1 );
+        dstNormal ( i, 2 ) = 1.0;
+    }
+
+    // 归一化
+
+    Matrix3d srcT, dstT;
+    normal ( srcNormal, srcT );
+    normal ( dstNormal, dstT );
+
+
+    //Ransac 去除外点
+    int n = srcPoints.size();
+    double p=0.99, w =0.5;
+    int s=4;
+    int maxN = log ( 1-p ) / log ( 1-pow ( ( 1-w ),s ) ) + 1;
+    double threshold = 0.2;
+
+    int bestCount=0;
+    std::vector<int> inlinersMask ( n );
+    for ( int i=0; i<maxN; ++i )
+    {
+
+        cv::RNG rng ( cv::getTickCount() );
+
+        std::set<int> indexes;
+        while(indexes.size() < 4){
+           indexes.insert( rand_int() % n);
+        }
+
+        Matrix3d M;
+        {
+            // 计算H 点法
+            MatrixXd _srcNormal ( s, 3 );
+            MatrixXd _dstNormal ( s, 3 );
+            std::set<int>::const_iterator iter = indexes.cbegin();
+            for ( int j=0; j<s; j++, iter++ ) {
+
+                _srcNormal ( j, 0 ) = srcNormal ( *iter, 0 );
+                _srcNormal ( j, 1 ) = srcNormal ( *iter, 1 );
+                _srcNormal ( j, 2 ) = 1.0;
+
+                _dstNormal ( j, 0 ) = dstNormal ( *iter, 0 );
+                _dstNormal ( j, 1 ) = dstNormal ( *iter, 1 );
+                _dstNormal ( j, 2 ) = 1.0;
+            }
+
+
+            VectorXd v = solveHomographyDLT ( _srcNormal, _dstNormal );
+            M << v(0), v(1), v(2),
+            v(3), v(4), v(5),
+            v(6), v(7), v(8);
+            M.array() /= v(8);
+        }
+
+        // 统计
+        std::vector<int> _inliners ( n );
+
+        {
+            MatrixXd _srcNormal =  srcNormal*M;
+            double _x, _y, _d_2;
+            double _threshold_2 = threshold*threshold;
+            int count=0;
+            for ( int j=0; j<n; ++j ) {
+
+                _x = _srcNormal ( j, 0 ) / _srcNormal ( j, 2 );
+                _y = _srcNormal ( j, 1 ) / _srcNormal ( j, 2 );
+                _d_2 = pow ( _x-dstNormal ( j, 0 ), 2 ) + pow ( _y-dstNormal ( j, 1 ), 2 );
+                if ( _d_2 <= _threshold_2 ) {
+                    _inliners[j] = 1;
+                    count ++;
+                } else {
+                    _inliners[j] = 0;
+                }
+
+            }
+
+            if ( bestCount < count ) {
+                bestCount = count;
+                inlinersMask.assign ( _inliners.begin(), _inliners.end() );
+            }
+        }
+
+
+    }
+    //求解
+
+    Matrix3d M;
+    {
+        // 计算H 点法
+        MatrixXd _srcNormal ( bestCount, 3 );
+        MatrixXd _dstNormal ( bestCount, 3 );
+
+        int temp=0;
+        for ( int j=0; j<n; ++j ) {
+            if ( inlinersMask[j]==0 )
+                continue;
+
+            _srcNormal ( temp, 0 ) = srcNormal ( j, 0 );
+            _srcNormal ( temp, 1 ) = srcNormal ( j, 1 );
+            _srcNormal ( temp, 2 ) = 1.0;
+
+            _dstNormal ( temp, 0 ) = dstNormal ( j, 0 );
+            _dstNormal ( temp, 1 ) = dstNormal ( j, 1 );
+            _dstNormal ( temp, 2 ) = 1.0;
+
+            temp++;
+        }
+
+
+        VectorXd v = solveHomographyDLT ( _srcNormal, _dstNormal );
+        M << v(0), v(1), v(2),
+        v(3), v(4), v(5),
+        v(6), v(7), v(8);
+        M.array() /= v(8);
+    }
+
+    // 反计算H
+
+    H = dstT.inverse() * M * srcT;
+
+    return true;
+
+}
 
 /**
  *  Vij=[hi1hj1  hi1hj2+hi2hj1  hi2hj2  hi3hj1+hi1hj3  hi3hj2+hi2hj3  hi3hj3]
@@ -228,8 +382,6 @@ VectorXd getVector(const Matrix3d& H, int i, int j)
  * 计算相机内参初始值, 求解Vb =0; 并计算K矩阵
  *
  */
-
-//!求内参
 Matrix3d solveInitCameraIntrinsic(std::vector<Matrix3d>& homos)
 {
     int n = homos.size();
@@ -279,7 +431,6 @@ Matrix3d solveInitCameraIntrinsic(std::vector<Matrix3d>& homos)
  *
  * 计算相机外参初始值
  */
-//!求外参
 void solveInitCameraExtrinsic(std::vector<Matrix3d>& homos, Matrix3d& K, std::vector<Matrix3d>& RList, std::vector<Vector3d>& tList)
 {
     // This is the initial status of the Camera Extrinsic parameter, which needs to be optimzized due to noises.
@@ -306,9 +457,8 @@ void solveInitCameraExtrinsic(std::vector<Matrix3d>& homos, Matrix3d& K, std::ve
         R.array().col(1) = r1;
         R.array().col(2) = r2;
 
-        std::cout <<"旋转 R " << R << std::endl;
-        std::cout <<"平移 t " << t.transpose() << std::endl;
-        std::cout <<"------------------------------ " << t.transpose() << std::endl;
+        std::cout <<"R " << R << std::endl;
+        std::cout <<"t " << t.transpose() << std::endl;
         RList.push_back(R);
         tList.push_back(t);
     }
@@ -478,7 +628,6 @@ double computeFisherReprojectionErrors(const vector<vector<Eigen::Vector3d>>& ob
 /**
  * 相机标定
  */
-//!!求H
 void computeCameraCalibration(std::vector<std::vector<Eigen::Vector2d>>& imagePoints,
                               std::vector<std::vector<Eigen::Vector3d>>& objectPoints, cv::Mat& cameraMatrix, cv::Mat& distCoeffs)
 {
@@ -506,7 +655,6 @@ void computeCameraCalibration(std::vector<std::vector<Eigen::Vector2d>>& imagePo
         homos.push_back(H);
     }
     std::cout << " fit homography finished" << std::endl;
-
 
     // 计算相机内参初始值
     std::cout << " solve init camera intrinsic ..." << std::endl;

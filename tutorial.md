@@ -150,7 +150,7 @@ Note that the origin of the image plane is on center. But the pixel plane's is o
 
 - $v$ and $u$ is the row_id and col_id of the image matrix
 
-$
+$$
 \begin{align}
 \begin{bmatrix}
     u \\
@@ -169,13 +169,14 @@ $
     1
     \end{bmatrix}
 \end{align}
-$
+$$
+
 
 Note that $c_x$ and $c_y$ are the offsets which ususally are $\frac {1}{2}$ of the image.
 
 So far, we do a recap. From world to pixel plane, we connect the eq3, eq6, eq7, eq8 and eq9. We can represent the transformation as follows:
 
-$
+$$
 \begin{align}
 \begin{bmatrix}
         u \\
@@ -208,18 +209,18 @@ $
         1
     \end{bmatrix} \\
 \end{align}
-$
+$$
 
 Note that
-$ 
+$$
 K = \begin{bmatrix}
         f_x           & \gamma        & c_x   & 0 \\
         0             & f_y           & c_y   & 0 \\
         0             & 0             & 1     & 0
     \end{bmatrix}
-$
+$$
 
-If you pay attention to the details, two new thigns are added. 
+If you pay attention to the details, two new signs are added. 
 -   you will find there is one more cofficients named $\gamma$ in camera matrix. $\gamma$ is the axis skew which is the angle of the x and y in image plane. For simplicity we set it 0 becuase usually $axis_x \perp axis_y$
 - a $[0, 0, 0]^T$ is columned by the camera matrix. The modification is introduced considerting about the matrix multiplication of $K[3 \times 4] \times R|t[4 \times 4]$ 
 
@@ -273,12 +274,23 @@ $$
     <h4>image: H1</h4>
 </div>
 From the above equations, we see that one point offers a pair of equations. We have 3x4 parameters such that 12 equations should be offerd, which are 6 points.
+
+Futher explanations, (x1, y1, z1) ----> u # the first eq; (x1, y1, z1) ----> v # the second eq
+<div align = center>
+    <img src = './imgs/1point2eq_1.jpg' width = '100%'>
+</div>
+
+<div align = center>
+    <img src = './imgs/1point2eq_2.jpg' width = '100%'>
+</div>
+
 <br>
 <br>
 <div align = center>
     <img src = './imgs/H2.jpg' width = '100%'>
     <h4>image: H2</h4>
 </div>
+
 <br>
 <br>
 <div align = center>
@@ -325,7 +337,7 @@ ref for details: [DLT part2](https://classroom.udacity.com/courses/ud810/lessons
 - the reason why $U$ can be get rid of, and $V^T$can be added is because $U$ and $V$ are both composed of unit vectors. It's known that a vector multiplied with an unit vector doesn't change its magnitude but only its orientation.
 <br><br><br>
 
-#### 3.1.3 Why did that substitution
+##### 3.1.2.1 Why did that substitution
 
 <div align = center>
     <img src = './imgs/SVD3.jpg' width = '100%'>
@@ -343,7 +355,9 @@ ref for details: [DLT part2](https://classroom.udacity.com/courses/ud810/lessons
     <img src = './imgs/SVD4.jpg' width = '80%'>
     <h4>image: SVD4</h4>
 </div>
+
 Just pull out the last column of $V$.
+
 
 
 
